@@ -1,0 +1,282 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Price Change of Microsoft stocks over the years</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f1f1f1;
+            margin: 0;
+            padding: 0;
+        }
+
+        h2 {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        p {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        #content {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        #chart {
+            margin: 0 auto; /* Center the SVG horizontally */
+            display: block;
+            width: 100%; /* Make the SVG take full width of its container */
+            max-width: 850px; /* Limit the maximum width of the SVG */
+            height: 525px; /* Set the height of the SVG */
+            background-color: #fff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .line-chart {
+            fill: none;
+            stroke: dimgray;
+            stroke-width: 1px;
+        }
+
+        .axis-label {
+            font-size: 12px;
+        }
+
+        .tooltip {
+            position: absolute;
+            display: none;
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 8px;
+            pointer-events: none;
+        }
+
+        .tooltip-text {
+            font-size: 12px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .pagination a {
+            color: black;
+            float: left;
+            padding: 8px 16px;
+            text-decoration: none;
+        }
+
+        .pagination a.active {
+            background-color: #6fafc7;
+            color: white;
+        }
+
+        .pagination a:hover:not(.active) {
+            background-color: #ddd;
+        }
+    </style>
+</head>
+<body>
+<div id="content">
+    <h2>Microsoft Stock Sale Volume from 1986 to 2023</h2>
+    <p>The line chart below visualizes the change<mark> of Sale Volume </mark> of Microsoft stock since 1986 for </p>
+    <p><mark>Move your mouse along the line</mark> to see how changes and the detail of date and exact sale volume of stock over the years</p>
+</div>
+
+<svg id="chart"></svg>
+
+<div class="tooltip"></div>
+
+<script>
+    // Fetch the CSV data and draw the line chart
+    d3.csv('https://raw.githubusercontent.com/jenniferG328/CS416-Final-Project/67cb9c67d49c76a407fc43aafcbcd830bc84d966/Microsoft%20Stocks.csv')
+        .then(data => {
+            // Parse the date and price values
+            const parseDate = d3.timeParse('%m/%d/%Y');
+            data.forEach(d => {
+                d.Date = parseDate(d.Date);
+                d.Volume = +d.Volume;
+            });
+
+            // Find the highest price and its corresponding data point
+            const highestVolume = d3.max(data, d => d.Volume);
+            const highestData = data.find(d => d.Volume === highestVolume);
+
+            // Set up the chart dimensions
+            const margin = { top: 20, right: 30, bottom: 30, left: 50 };
+            const width = 800 - margin.left - margin.right;
+            const height = 500 - margin.top - margin.bottom;
+
+            // Create the SVG element
+            const svg = d3.select('#chart')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom);
+
+            // Create a group element for the chart content
+            const chart = svg.append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Set up the x and y scales
+            const x = d3.scaleTime().range([0, width]);
+            const y = d3.scaleLinear().range([height, 0]);
+
+            // Define the line
+            const line = d3.line()
+                .x(d => x(d.Date))
+                .y(d => y(d.Volume));
+
+            // Set the domains of the scales
+            x.domain(d3.extent(data, d => d.Date));
+            y.domain([0, d3.max(data, d => d.Volume)]);
+
+            // Add the x and y axes
+            chart.append('g')
+                .attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .append('text')
+                .attr('class', 'axis-label')
+                .attr('x', width / 2)
+                .attr('y', 30)
+                .attr('fill', '#000')
+                .text('Date');
+
+            chart.append('g')
+                .call(d3.axisLeft(y).tickFormat(d3.format(".2s")))
+                .append('text')
+                .attr('class', 'axis-label')
+                .attr('transform', 'rotate(-90)')
+                .attr('x', -height / 2)
+                .attr('y', -35)
+                .attr('fill', '#000')
+                .text('Sale Volume');
+
+            // Add the line path
+            chart.append('path')
+                .datum(data)
+                .attr('class', 'line-chart')
+                .attr('d', line);
+
+            // Add a circle to represent the highest price
+            chart.append('circle')
+                .attr('cx', x(highestData.Date))
+                .attr('cy', y(highestData.Volume))
+                .attr('r', 6)
+                .attr('fill', 'red');
+
+            // Add text label for the highest price and date
+            chart.append('text')
+                .attr('x', x(highestData.Date) + 10)
+                .attr('y', y(highestData.Volume) - 10)
+                .attr('class', 'axis-label')
+                .attr('fill', 'red')
+                .text(`Highest Sale Volume: $${highestVolume}`);
+
+            chart.append('text')
+                .attr('x', x(highestData.Date) + 10)
+                .attr('y', y(highestData.Volume) + 10)
+                .attr('class', 'axis-label')
+                .attr('fill', 'red')
+                .text(`Date: ${highestData.Date.toLocaleDateString()}`);
+
+            // Create the circle that travels along the curve
+            const focus = chart.append('g')
+                .append('circle')
+                .attr('stroke', 'black')
+                .attr('r', 4)
+                .style('fill', 'none')
+                .style('opacity', 0);
+
+            // Create the tooltip
+            const tooltip = d3.select('.tooltip');
+
+            // Create the rectangle on top of the SVG area to capture mouse position
+            chart.append('rect')
+                .style('fill', 'none')
+                .style('pointer-events', 'all')
+                .attr('width', width)
+                .attr('height', height)
+                .on('mouseover', mouseover)
+                .on('mousemove', mousemove)
+                .on('mouseout', mouseout);
+
+            function mouseover() {
+                focus.style('opacity', 1);
+                tooltip.style('display', 'block');
+            }
+
+            function mousemove(event) {
+                // Recover the x-coordinate of the mouse position
+                var mouseX = d3.pointer(event)[0];
+
+                // Find the closest point on the curve
+                var closestData = data.reduce(function (a, b) {
+                    var aDiff = Math.abs(mouseX - x(a.Date));
+                    var bDiff = Math.abs(mouseX - x(b.Date));
+                    return aDiff < bDiff ? a : b;
+                });
+
+                // Update the positioning of the circle
+                focus.attr('cx', x(closestData.Date)).attr('cy', y(closestData.Volume));
+
+                // Calculate the position of the tooltip relative to the SVG
+                const tooltipWidth = tooltip.node().offsetWidth;
+                const tooltipHeight = tooltip.node().offsetHeight;
+                const tooltipLeft = x(closestData.Date) + margin.left - tooltipWidth / 2;
+                const tooltipTop = y(closestData.Volume) + margin.top - tooltipHeight - 10;
+
+                // Adjust the tooltip position to keep it within the SVG boundaries
+                let adjustedTooltipLeft = tooltipLeft;
+                let adjustedTooltipTop = tooltipTop;
+
+                if (tooltipLeft < margin.left) {
+                    adjustedTooltipLeft = margin.left;
+                } else if (tooltipLeft + tooltipWidth > width + margin.left) {
+                    adjustedTooltipLeft = width + margin.left - tooltipWidth;
+                }
+
+                if (tooltipTop < margin.top) {
+                    adjustedTooltipTop = margin.top;
+                } else if (tooltipTop + tooltipHeight > height + margin.top) {
+                    adjustedTooltipTop = height + margin.top - tooltipHeight;
+                }
+
+                tooltip
+                    .style('left', `${adjustedTooltipLeft}px`)
+                    .style('top', `${adjustedTooltipTop}px`)
+                    .html(`
+                        <p class="tooltip-text">Date: ${closestData.Date.toLocaleDateString()}</p>
+                        <p class="tooltip-text">Price: ${closestData.Volume}</p>
+                    `);
+            }
+
+            function mouseout() {
+                focus.style('opacity', 0);
+                tooltip.style('display', 'none');
+            }
+        })
+        .catch(error => {
+            console.log('Error fetching the CSV data:', error);
+        });
+</script>
+
+<div class="pagination">
+    <a href="#">&laquo;</a>
+    <a href="index.html">1</a>
+    <a class="active" href="Sale%20Volume.html">2</a>
+    <a href="Price.html">3</a>
+    <a href="Highest%20Price.html">4</a>
+    <a href="Low%20Price.html">5</a>
+    <a href="#">&raquo;</a>
+</div>
+</body>
+</html>
