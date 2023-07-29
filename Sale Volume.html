@@ -32,7 +32,7 @@
             margin: 0 auto; /* Center the SVG horizontally */
             display: block;
             width: 100%; /* Make the SVG take full width of its container */
-            max-width: 850px; /* Limit the maximum width of the SVG */
+            max-width: 1000px; /* Limit the maximum width of the SVG */
             height: 525px; /* Set the height of the SVG */
             background-color: #fff;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
@@ -66,7 +66,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-top: 20px;
+            margin-top: 50px;
         }
 
         .pagination a {
@@ -108,6 +108,9 @@
                 d.Volume = +d.Volume;
             });
 
+            // Calculate the average sale volume
+            const averageVolume = d3.mean(data, d => d.Volume);
+
             // Find the highest price and its corresponding data point
             const highestVolume = d3.max(data, d => d.Volume);
             const highestData = data.find(d => d.Volume === highestVolume);
@@ -133,35 +136,40 @@
             // Define the line
             const line = d3.line()
                 .x(d => x(d.Date))
-                .y(d => y(d.Volume));
+                .y(d => y(d.Volume))
+                .curve(d3.curveMonotoneX); // Add curve to the line;
 
             // Set the domains of the scales
             x.domain(d3.extent(data, d => d.Date));
             y.domain([0, d3.max(data, d => d.Volume)]);
 
             // Add the x and y axes
-            chart.append('g')
+            const xAxis = chart.append('g')
                 .attr('transform', `translate(0,${height})`)
-                .call(d3.axisBottom(x))
-                .append('text')
-                .attr('class', 'axis-label')
-                .attr('x', width / 2)
-                .attr('y', 30)
-                .attr('fill', '#000')
-                .text('Date');
+                .call(d3.axisBottom(x).ticks(10));
 
-            chart.append('g')
-                .call(d3.axisLeft(y).tickFormat(d3.format(".2s")))
-                .append('text')
+            const yAxis = chart.append('g')
+                .call(d3.axisLeft(y).tickFormat(d3.format(".2s")).ticks(10));
+
+            // Add the y-axis label
+            chart.append('text')
                 .attr('class', 'axis-label')
                 .attr('transform', 'rotate(-90)')
                 .attr('x', -height / 2)
-                .attr('y', -35)
+                .attr('y', -40) // Adjust the position of the label
                 .attr('fill', '#000')
                 .text('Sale Volume');
 
+            // Add the x-axis label
+            chart.append('text')
+                .attr('class', 'axis-label')
+                .attr('x', width / 2)
+                .attr('y', height + 40) // Adjust the position of the label
+                .attr('fill', '#000')
+                .text('Date');
+
             // Add the line path
-            chart.append('path')
+            const linePath = chart.append('path')
                 .datum(data)
                 .attr('class', 'line-chart')
                 .attr('d', line);
@@ -195,6 +203,25 @@
                 .attr('r', 4)
                 .style('fill', 'none')
                 .style('opacity', 0);
+
+            // Add the average price line to the chart
+            chart.append('line')
+                .attr('x1', 0)
+                .attr('y1', y(averageVolume))
+                .attr('x2', width)
+                .attr('y2', y(averageVolume))
+                .attr('stroke', 'green')
+                .attr('stroke-dasharray', '4')
+                .attr('stroke-width', 2);
+
+            // Add text label for the average price
+            chart.append('text')
+                .attr('x', width - 10)
+                .attr('y', y(averageVolume) - 10)
+                .attr('class', 'axis-label')
+                .attr('fill', 'green')
+                .text(`Average Sale Volume: $${averageVolume.toFixed(2)}`);
+
 
             // Create the tooltip
             const tooltip = d3.select('.tooltip');
@@ -263,11 +290,65 @@
                 focus.style('opacity', 0);
                 tooltip.style('display', 'none');
             }
+
+            // Add a rectangle button with text
+            const buttonWidth = 200;
+            const buttonHeight = 30;
+            const buttonMargin = 20;
+
+            const buttonGroup = svg.append('g')
+                .attr('transform', `translate(${width + margin.right +50 - buttonMargin},${height + margin.bottom - buttonHeight - buttonMargin})`)
+                .attr('cursor', 'pointer')
+                .on('click', buttonClick);
+
+            const buttonRect = buttonGroup.append('rect')
+                .attr('width', buttonWidth)
+                .attr('height', buttonHeight)
+                .attr('rx', 5) // Rounded corners
+                .attr('ry', 5) // Rounded corners
+                .attr('fill', 'steelblue');
+
+            const buttonText = buttonGroup.append('text')
+                .attr('x', buttonWidth / 2)
+                .attr('y', buttonHeight / 2)
+                .attr('text-anchor', 'middle')
+                .attr('dominant-baseline', 'middle')
+                .attr('fill', 'white')
+                .style('pointer-events', 'none') // Make sure the button doesn't block mouse events on the chart
+                .style('font-size', '12px') // Set the font size of the button text
+                .text('US Subprime Mortgage Crisis');
+
+            // Function to handle button click
+            function buttonClick() {
+                // Update the line color to steelblue
+                linePath.attr('stroke', 'steelblue');
+
+                // Update the data to display the desired date range
+                const filteredData = data.filter(d => d.Date >= new Date('2007-01-01') && d.Date <= new Date('2010-12-31'));
+
+                // Update the x and y domains based on the filtered data
+                x.domain(d3.extent(filteredData, d => d.Date));
+                y.domain([0, d3.max(filteredData, d => d.Volume)]);
+
+                // Update the x and y axes with the new scales and ticks
+                xAxis.transition().call(d3.axisBottom(x).ticks(d3.timeYear));
+                yAxis.transition().call(d3.axisLeft(y).tickFormat(d3.format(".2s")).ticks(10));
+
+                // Update the line path with the new data
+                linePath.datum(filteredData)
+                    .transition()
+                    .duration(500)
+                    .attr('d', line);
+            }
         })
         .catch(error => {
             console.log('Error fetching the CSV data:', error);
         });
 </script>
+
+<h2>Conclusion</h2>
+<p>Once you clicked the blue button, you will see how Sale Volume changed during the US Subprime Mortgage Crisis period(2007-2010)</p>
+<p>The sale volume has changed within a steady range <strong>except for few dates </strong> over the past of 37 years</p>
 
 <div class="pagination">
     <a href="#">&laquo;</a>
